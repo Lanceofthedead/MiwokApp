@@ -1,5 +1,7 @@
 package com.example.android.miwok;
 
+import android.content.Context;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
@@ -11,7 +13,36 @@ import java.util.ArrayList;
 
 public class NumbersActivity extends AppCompatActivity {
 
+    /** handles playback of all audio files*/
     private MediaPlayer mMediaPlayer;
+
+    /** handles audio focus when playing a sound file*/
+    private AudioManager mAudioManager;
+
+    AudioManager.OnAudioFocusChangeListener mOnAudioFocusChangeListener =
+            new AudioManager.OnAudioFocusChangeListener() {
+                @Override
+                public void onAudioFocusChange(int focusChange) {
+                    if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT ||
+                            focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
+                        // AUDIO_FOCUS_LOSS_TRANSIENT case means that we've lost audio focus for a short
+                        // amount of time. AUDIO_FOCUS_LOSS_TRANSIENT_CAN_DUCK case means that our app is
+                        // allowed to continue playing sound but at a lower volume. we'll treat both cases
+                        // the same way because our app is playing short sound files
+
+                        // pause playback and reset player to the start of the file. that way we can
+                        // play the word from the beginning when we resume playback
+                        mMediaPlayer.pause();
+                        mMediaPlayer.seekTo(0);
+                    } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN){
+                        // AUDIOFOCUS_GAIN case means we have regained focus and can resume playback
+                        mMediaPlayer.start();
+                    }else if (focusChange == AudioManager.AUDIOFOCUS_LOSS){
+                        // AUDIOFOCUS_LOSS case means we've lost audio focus and stop playback and clean resources
+                        mMediaPlayer.release();
+                    }
+                }
+            };
 
     /**
           * This listener gets triggered when the {@link MediaPlayer} has completed
@@ -39,6 +70,11 @@ public class NumbersActivity extends AppCompatActivity {
             // setting the media player to null is an easy way to tell that the media player
             // is not configured to play an audio file at the moment.
             mMediaPlayer = null;
+
+            // Regardless of whether or not we were granted audio focus, abandon it. This also
+            // unregisters the AudioFocusChangeListener so we don't get anymore callbacks.
+            // Abandon audio focus when playback complete
+            mAudioManager.abandonAudioFocus(mOnAudioFocusChangeListener);
         }
     }
 
@@ -46,35 +82,9 @@ public class NumbersActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.word_list);
-//  array
-//        String[] words = new String[10];
-//        words[0] = "One";
-//        words[1] = "Two";
-//        words[2] = "Three";
-//        words[3] = "Four";
-//        words[4] = "Five";
-//        words[5] = "Six";
-//        words[6] = "Seven";
-//        words[7] = "Eight";
-//        words[8] = "Nine";
-//        words[9] = "Ten";
-//
-//        Log.v("NumbersActivity", "Word at index 0: "+words[0]);
-//        Log.v("NumbersActivity", "Word at index 1: "+words[1]);
 
-//        //arrayList
-//        ArrayList<String> words = new ArrayList<>();
-//
-//        words.add("one");
-//        words.add("two");
-//        words.add("three");
-//        words.add("four");
-//        words.add("five");
-//        words.add("six");
-//        words.add("seven");
-//        words.add("eight");
-//        words.add("nine");
-//        words.add("ten");
+        // create and setup the (@link AudioManager) to request audio focus
+        mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
         //arrayList using Word.java class
         final ArrayList<Word> words = new ArrayList<Word>();
@@ -121,15 +131,26 @@ public class NumbersActivity extends AppCompatActivity {
                 // Release media player if it currently exists because we are about to play a different audio file
                 releaseMediaPlayer();
 
-                // create and setup the (@link MediaPlayer) for the audio resource associated with the current word
-                mMediaPlayer = MediaPlayer.create(NumbersActivity.this,word.getAudioResourceId());
+                // Request audio focus for playback
+                int result = mAudioManager.requestAudioFocus(mOnAudioFocusChangeListener,
+                        // Use the music stream.
+                        AudioManager.STREAM_MUSIC,
+                        // Request permanent focus.
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
 
-                // start the audio file
-                mMediaPlayer.start(); //no need to call prepare
+                if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
 
-                // setup a listener on the media player , so that we can stop and release the media player
-                // once the sound has finished playing
-                mMediaPlayer.setOnCompletionListener(mCompletionListener);
+                    // We have audio focus now
+                    // create and setup the (@link MediaPlayer) for the audio resource associated with the current word
+                    mMediaPlayer = MediaPlayer.create(NumbersActivity.this,word.getAudioResourceId());
+
+                    // start the audio file
+                    mMediaPlayer.start(); //no need to call prepare
+
+                    // setup a listener on the media player , so that we can stop and release the media player
+                    // once the sound has finished playing
+                    mMediaPlayer.setOnCompletionListener(mCompletionListener);
+                }
             }
         });
 
