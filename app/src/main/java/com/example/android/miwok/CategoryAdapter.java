@@ -14,6 +14,8 @@ import android.support.v4.app.FragmentPagerAdapter;
  */
 public class CategoryAdapter extends FragmentPagerAdapter {
 
+    private String tableTitles[] = new String[]{"Numbers", "Colors", "Family", "Phrases"};
+
     /**
      * Create a new {@link CategoryAdapter} object.
      *
@@ -46,5 +48,11 @@ public class CategoryAdapter extends FragmentPagerAdapter {
     @Override
     public int getCount() {
         return 4;
+    }
+
+    @Override
+    public CharSequence getPageTitle(int position){
+        // generate title based on item position
+        return tableTitles[position];
     }
 }
